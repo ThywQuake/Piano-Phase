@@ -1,0 +1,5 @@
+{
+  "name": "Piano Phase Visualizer",
+  "description": "Interactive visualization of Steve Reich's Piano Phase, demonstrating the phasing process with synchronized audio and music notation.",
+  "requestFramePermissions": []
+}
