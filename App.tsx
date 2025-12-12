@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RefreshCw, Info, Settings2, X } from 'lucide-react';
+import { Play, Pause, RefreshCw, Info, Settings2, X, Music, Github } from 'lucide-react';
 import { MusicStaff } from './components/MusicStaff';
 import { soundEngine } from './services/SoundEngine';
 import { MELODY, NOTE_COUNT } from './constants';
@@ -121,17 +121,93 @@ const App: React.FC = () => {
   // Convert to Notes (Total 12)
   const notesDiff = rawDiff * NOTE_COUNT;
   
-  // Highlight logic
-  // 6.00 is exactly 0.5 phase (anti-phase)
-  // 0.00 / 12.00 is locked
-  const isLocked = notesDiff < 0.1 || notesDiff > 11.9;
-  const isAnti = Math.abs(notesDiff - 6.0) < 0.1;
-  const isSubPhase = Math.abs(notesDiff % 1) < 0.1; // Hits an exact note shift?
+  // Highlight logic: Highlight 0.0, 0.5, 1.0, 1.5 ... (Multiples of 0.5)
+  // We check if distance to nearest 0.5 is small
+  const doubled = notesDiff * 2;
+  const nearestHalf = Math.round(doubled) / 2;
+  const distToHalf = Math.abs(notesDiff - nearestHalf);
   
-  let phaseColorClass = "text-stone-500";
-  if (isLocked) phaseColorClass = "text-blue-600 font-bold scale-110";
-  else if (isAnti) phaseColorClass = "text-purple-600 font-bold scale-110";
-  else if (isSubPhase) phaseColorClass = "text-stone-800 font-bold";
+  const isHighlight = distToHalf < 0.05; // Tight tolerance 0.05 notes
+  
+  // Determine color based on "exactness"
+  let phaseColorClass = "text-stone-400";
+  if (isHighlight) {
+    // Check if it's a whole integer (Main beats) vs half (Off beats)
+    const isInteger = Math.abs(nearestHalf % 1) < 0.01;
+    if (isInteger) {
+         // Integer -> Low AD Green (Emerald)
+         phaseColorClass = "text-emerald-500 font-bold scale-110";
+    } else {
+         // Half -> High AD Red (Rose)
+         phaseColorClass = "text-rose-500 font-bold scale-105";
+    }
+  }
+
+  // Shared Chaos Meter Content
+  const renderChaosMeter = (isVertical: boolean) => (
+    <div className={`flex ${isVertical ? 'flex-col items-center py-4' : 'flex-row items-center px-4 py-3'} h-full w-full bg-white rounded-2xl shadow-sm border border-stone-200 relative gap-4`}>
+        {/* Label */}
+        <div 
+            onClick={() => setIsInfoOpen(true)}
+            className="cursor-pointer hover:text-blue-500 transition-colors flex items-center"
+            style={isVertical ? { writingMode: 'vertical-rl', transform: 'rotate(180deg)' } : {}}
+        >
+            <span className="text-xs font-bold text-stone-500 uppercase tracking-widest whitespace-nowrap flex items-center gap-1">
+                Auditory Density <Info size={14} className={isVertical ? "mb-1" : "ml-1"}/>
+            </span>
+        </div>
+        
+        {/* Meter Bar */}
+        <div className={`flex-1 bg-stone-100 rounded-full relative overflow-hidden border border-stone-100 ${isVertical ? 'w-6 h-full' : 'h-4 w-full'}`}>
+            <div 
+                className="absolute bg-gradient-to-r lg:bg-gradient-to-t from-emerald-400 via-yellow-400 to-rose-500 transition-all duration-300 ease-out"
+                style={isVertical ? { 
+                    width: '100%',
+                    bottom: 0,
+                    height: `${Math.min(100, (chaosScore / 30) * 100)}%`
+                } : {
+                    height: '100%',
+                    left: 0,
+                    width: `${Math.min(100, (chaosScore / 30) * 100)}%`
+                }} 
+            ></div>
+        </div>
+
+        {/* Score Number */}
+        <div className={`text-xl font-mono font-bold text-stone-700 ${isVertical ? 'mb-6 text-center' : 'w-8 text-right'}`}>
+            {chaosScore}
+        </div>
+
+        {/* Settings Button */}
+        <div className="relative">
+            <button 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsSettingsOpen(!isSettingsOpen);
+                }}
+                className={`p-2 rounded-full transition-colors ${isSettingsOpen ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}
+            >
+                <Settings2 size={18} />
+            </button>
+            
+            {/* Popover */}
+            {isSettingsOpen && (
+                <div 
+                    onClick={(e) => e.stopPropagation()}
+                    className={`absolute z-20 bg-stone-800 text-white p-3 rounded-lg shadow-xl w-48 ${isVertical ? 'right-full top-1/2 -translate-y-1/2 mr-3' : 'bottom-full right-0 mb-3'}`}
+                >
+                    <div className="text-xs font-bold mb-2">History Window: {chaosWindow}s</div>
+                    <input 
+                        type="range" min="0.5" max="5.0" step="0.5"
+                        value={chaosWindow}
+                        onChange={(e) => setChaosWindow(parseFloat(e.target.value))}
+                        className="w-full h-1 bg-stone-600 rounded appearance-none cursor-pointer accent-white"
+                    />
+                </div>
+            )}
+        </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans selection:bg-stone-200 flex flex-col" onClick={() => setIsSettingsOpen(false)}>
@@ -163,7 +239,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <div className="flex-1 max-w-6xl mx-auto px-4 py-8 w-full flex gap-6">
+      <div className="flex-1 max-w-7xl mx-auto px-4 py-8 w-full flex flex-row gap-8">
         
         {/* Main Content Area */}
         <div className="flex-1 min-w-0">
@@ -185,7 +261,7 @@ const App: React.FC = () => {
             </div>
 
             {/* Staves */}
-            <div className="space-y-4">
+            <div className="space-y-6">
                 <MusicStaff 
                     label="Player 1 (Steady)" 
                     progressP1={p1Progress} 
@@ -214,9 +290,14 @@ const App: React.FC = () => {
                 </div>
             </div>
 
+            {/* Mobile/Tablet Chaos Meter (Horizontal) - Hidden on Large Screens */}
+            <div className="mt-8 lg:hidden">
+                {renderChaosMeter(false)}
+            </div>
+
             {/* Controls Bar */}
-            <div className="mt-8 bg-white p-4 rounded-xl shadow-sm border border-stone-200 flex flex-wrap items-center gap-6">
-                <div className="flex items-center gap-2">
+            <div className="mt-6 bg-white p-4 rounded-xl shadow-sm border border-stone-200 flex flex-col sm:flex-row items-center gap-6">
+                <div className="flex items-center gap-2 self-start sm:self-center">
                     <button 
                         onClick={togglePlay}
                         className="flex items-center justify-center w-12 h-12 rounded-full bg-stone-900 text-white hover:bg-stone-700 transition-colors shadow-md"
@@ -228,10 +309,10 @@ const App: React.FC = () => {
                     </button>
                 </div>
 
-                <div className="h-8 w-px bg-stone-200 mx-2 hidden md:block"></div>
+                <div className="h-px w-full sm:h-8 sm:w-px bg-stone-200 mx-2"></div>
 
                 {/* Sliders Grid */}
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
                     <div className="min-w-[150px]">
                         <div className="flex justify-between mb-1">
                             <label className="text-xs font-bold text-stone-500 uppercase">Phase Speed</label>
@@ -257,69 +338,55 @@ const App: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Description Section */}
+            <div className="mt-12 border-t border-stone-200 pt-8 pb-8">
+                <div className="flex flex-col gap-6 max-w-4xl">
+                    <div className="flex items-start gap-4">
+                        <div className="p-3 bg-stone-100 rounded-full text-stone-500 hidden sm:block">
+                            <Music size={24} />
+                        </div>
+                        <div className="flex-1">
+                            <h2 className="text-xl font-bold text-stone-800 mb-2">About Piano Phase</h2>
+                            <div className="prose prose-stone text-sm text-stone-600 leading-relaxed space-y-3">
+                                <p>
+                                    <strong>Piano Phase</strong> (1967) is one of the first and most famous examples of minimalism in music, composed by 
+                                    Steve Reich. It employs a technique called <span className="text-stone-800 font-semibold">phasing</span>.
+                                </p>
+                                <p>
+                                    Two pianists begin by playing the same repeating twelve-note melody in unison. One pianist keeps a steady tempo, 
+                                    while the other gradually accelerates until they are playing slightly faster. As the second pianist pulls ahead, 
+                                    the two melodies shift out of sync, creating a series of complex, ever-changing rhythmic patterns and resulting harmonies.
+                                </p>
+                                <p>
+                                    Eventually, the second pianist gets exactly one note ahead (a phase shift of 1 note), then two notes, and so on, 
+                                    until the cycle completes and they are back in unison. This application visualizes this process, allowing you to 
+                                    see how simple inputs can create complex emergent behavior.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-sm text-stone-500 border-t border-stone-100 pt-4">
+                        <Github size={16} />
+                        <span>Project Source:</span>
+                        <a 
+                            href="https://github.com/ThywQuake/Piano-Phase" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline font-mono"
+                        >
+                            https://github.com/ThywQuake/Piano-Phase
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        {/* Sidebar: Chaos Meter */}
-        <div className="w-24 flex flex-col items-center pt-24 shrink-0">
-             <div className="flex flex-col items-center h-full max-h-[500px] w-full bg-white rounded-2xl shadow-sm border border-stone-200 py-4 relative">
-                
-                {/* Fixed Label: Rotate -90 degrees properly */}
-                <div 
-                    onClick={() => setIsInfoOpen(true)}
-                    className="cursor-pointer hover:text-blue-500 transition-colors mb-4"
-                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                >
-                   <span className="text-xs font-bold text-stone-500 uppercase tracking-widest whitespace-nowrap">
-                       Auditory Density <Info size={10} className="inline ml-1 mb-1"/>
-                   </span>
-                </div>
-                
-                {/* Meter Container */}
-                <div className="flex-1 w-6 bg-stone-100 rounded-full relative overflow-hidden mb-4 border border-stone-100">
-                    <div 
-                        className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-emerald-400 via-yellow-400 to-rose-500 transition-all duration-300 ease-out"
-                        style={{ height: `${Math.min(100, (chaosScore / 30) * 100)}%` }} 
-                    ></div>
-                    {/* Ticks */}
-                    {[1,2,3,4].map(i => (
-                        <div key={i} className="absolute w-full h-px bg-white/50" style={{ bottom: `${i*20}%`}}></div>
-                    ))}
-                </div>
-
-                <div className="text-2xl font-mono font-bold text-stone-700 mb-6">
-                    {chaosScore}
-                </div>
-
-                {/* Window Setting */}
-                <div className="relative">
-                    <button 
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setIsSettingsOpen(!isSettingsOpen);
-                        }}
-                        className={`p-2 rounded-full transition-colors ${isSettingsOpen ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}
-                    >
-                        <Settings2 size={18} />
-                    </button>
-                    
-                    {/* Popover for slider */}
-                    {isSettingsOpen && (
-                        <div 
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute right-full top-1/2 -translate-y-1/2 mr-3 bg-stone-800 text-white p-3 rounded-lg shadow-xl w-48 z-20"
-                        >
-                            <div className="text-xs font-bold mb-2">History Window: {chaosWindow}s</div>
-                            <input 
-                                type="range" min="0.5" max="5.0" step="0.5"
-                                value={chaosWindow}
-                                onChange={(e) => setChaosWindow(parseFloat(e.target.value))}
-                                className="w-full h-1 bg-stone-600 rounded appearance-none cursor-pointer accent-white"
-                            />
-                            {/* Arrow */}
-                            <div className="absolute top-1/2 right-[-4px] -translate-y-1/2 w-2 h-2 bg-stone-800 rotate-45"></div>
-                        </div>
-                    )}
-                </div>
+        {/* Desktop Chaos Meter (Vertical Sidebar) - Hidden on Mobile/Tablet */}
+        <div className="w-24 shrink-0 pt-24 hidden lg:block">
+             <div className="h-[500px] w-full sticky top-8">
+                {renderChaosMeter(true)}
              </div>
         </div>
 

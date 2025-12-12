@@ -125,70 +125,71 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
   };
 
   return (
-    <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 relative overflow-hidden select-none">
-      <div className="absolute top-2 left-2 text-xs font-bold text-gray-400 uppercase tracking-widest z-10 bg-white/80 px-2 rounded">
+    <div className="w-full">
+      <div className="mb-1 text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">
         {label}
       </div>
+      <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 relative overflow-hidden select-none">
+        <svg 
+          ref={svgRef}
+          viewBox={`0 0 ${STAFF_WIDTH} ${STAFF_HEIGHT}`} 
+          className={`w-full h-auto block ${onDividerDrag ? 'cursor-row-resize' : ''}`}
+          preserveAspectRatio="xMidYMid slice"
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        >
+          {/* Playhead Marker (Fixed) */}
+          <line 
+              x1={PLAYHEAD_X} y1={0} x2={PLAYHEAD_X} y2={STAFF_HEIGHT} 
+              stroke="rgba(255,0,0,0.3)" strokeWidth="2" strokeDasharray="4 2" 
+          />
 
-      <svg 
-        ref={svgRef}
-        viewBox={`0 0 ${STAFF_WIDTH} ${STAFF_HEIGHT}`} 
-        className={`w-full h-auto block ${onDividerDrag ? 'cursor-row-resize' : ''}`}
-        preserveAspectRatio="xMidYMid slice"
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-      >
-        {/* Playhead Marker (Fixed) */}
-        <line 
-            x1={PLAYHEAD_X} y1={0} x2={PLAYHEAD_X} y2={STAFF_HEIGHT} 
-            stroke="rgba(255,0,0,0.3)" strokeWidth="2" strokeDasharray="4 2" 
-        />
+          {/* Staff Lines */}
+          <g opacity={0.3}>
+              {lines.map((y, i) => (
+              <line 
+                  key={i} 
+                  x1={0} y1={y} x2={STAFF_WIDTH} y2={y} 
+                  stroke="#9ca3af" strokeWidth="1" 
+              />
+              ))}
+          </g>
+          
+          {/* Clef */}
+          <text x={10} y={BASE_Y - 10} fontSize="32" fill="#d1d5db" style={{ fontFamily: 'serif' }}>𝄞</text>
 
-        {/* Staff Lines */}
-        <g opacity={0.3}>
-            {lines.map((y, i) => (
-            <line 
-                key={i} 
-                x1={0} y1={y} x2={STAFF_WIDTH} y2={y} 
-                stroke="#9ca3af" strokeWidth="1" 
-            />
-            ))}
-        </g>
-        
-        {/* Clef */}
-        <text x={10} y={BASE_Y - 10} fontSize="32" fill="#d1d5db" style={{ fontFamily: 'serif' }}>𝄞</text>
+          {/* Draggable Divider Line (High/Low) */}
+          {dividerY !== undefined && (
+              <g transform={`translate(0, ${dividerY * STAFF_HEIGHT})`}
+                  onPointerDown={handlePointerDown}
+                  className="cursor-row-resize"
+              >
+                  {/* Hit area for easier grabbing */}
+                  <rect x="0" y="-10" width={STAFF_WIDTH} height="20" fill="transparent" />
+                  <line 
+                      x1={0} y1={0} x2={STAFF_WIDTH} y2={0} 
+                      stroke="#a8a29e" strokeWidth="1.5" strokeDasharray="6 4"
+                  />
+                  <text x={STAFF_WIDTH - 60} y={-4} fontSize="10" fill="#a8a29e" fontStyle="italic">Split</text>
+              </g>
+          )}
 
-        {/* Draggable Divider Line (High/Low) */}
-        {dividerY !== undefined && (
-             <g transform={`translate(0, ${dividerY * STAFF_HEIGHT})`}
-                onPointerDown={handlePointerDown}
-                className="cursor-row-resize"
-             >
-                {/* Hit area for easier grabbing */}
-                <rect x="0" y="-10" width={STAFF_WIDTH} height="20" fill="transparent" />
-                <line 
-                    x1={0} y1={0} x2={STAFF_WIDTH} y2={0} 
-                    stroke="#a8a29e" strokeWidth="1.5" strokeDasharray="6 4"
-                />
-                <text x={STAFF_WIDTH - 60} y={-4} fontSize="10" fill="#a8a29e" fontStyle="italic">Split</text>
-             </g>
-        )}
+          {/* Notes */}
+          {[-1, 0, 1, 2].map(loopOffset => (
+              <g key={loopOffset}>
+                  {mode === 'p1' && groups.map(g => renderBeamedGroup(g, progressP1, PlayerColor.P1, loopOffset))}
+                  {mode === 'p2' && groups.map(g => renderBeamedGroup(g, progressP2, PlayerColor.P2, loopOffset))}
+                  {mode === 'fusion' && (
+                      <>
+                          {groups.map(g => renderBeamedGroup(g, progressP1, '#1f2937', loopOffset))}
+                          {groups.map(g => renderBeamedGroup(g, progressP2, '#1f2937', loopOffset))}
+                      </>
+                  )}
+              </g>
+          ))}
 
-        {/* Notes */}
-        {[-1, 0, 1, 2].map(loopOffset => (
-            <g key={loopOffset}>
-                {mode === 'p1' && groups.map(g => renderBeamedGroup(g, progressP1, PlayerColor.P1, loopOffset))}
-                {mode === 'p2' && groups.map(g => renderBeamedGroup(g, progressP2, PlayerColor.P2, loopOffset))}
-                {mode === 'fusion' && (
-                    <>
-                        {groups.map(g => renderBeamedGroup(g, progressP1, '#1f2937', loopOffset))}
-                        {groups.map(g => renderBeamedGroup(g, progressP2, '#1f2937', loopOffset))}
-                    </>
-                )}
-            </g>
-        ))}
-
-      </svg>
+        </svg>
+      </div>
     </div>
   );
 };
