@@ -541,7 +541,7 @@ const App: React.FC = () => {
                     <div className="shrink-0 hidden sm:block pt-2 flex flex-col items-center">
                         <a href="https://stevereich.com/" target="_blank" rel="noopener noreferrer" className="flex flex-col items-center group">
                             <img 
-                                src="./public/icon.jpeg" 
+                                src="./icon.jpeg" 
                                 alt="Steve Reich Portrait" 
                                 className="w-32 h-32 rounded-full object-cover shadow-xl border-4 border-white transition-all group-hover:shadow-2xl group-hover:border-stone-200"
                             />
