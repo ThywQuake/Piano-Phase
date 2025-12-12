@@ -1,20 +1,35 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Piano Phase Visualizer
 
-# Run and deploy your AI Studio app
+## Project Overview
 
-This contains everything you need to run your app locally.
+This is an interactive web application designed to visualize **Steve Reich's minimalist composition, Piano Phase (1967)**. It aims to demonstrate the phasing process with synchronized audio and music notation, allowing users to observe the complex rhythmic patterns that emerge as the two voices gradually move out of sync.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1mmAhct60kS1evI3TB1XxW2P4UWSPHKY5
+The interface features controls for tempo, phasing speed, instrument timbre, and a unique "Auditory Density" meter that quantifies the rhythmic irregularity of the acoustic result.
 
-## Run Locally
+## Deployment Webpage
 
-**Prerequisites:**  Node.js
+You can view the live, deployed version of the application here:
+[https://thywquake.github.io/Piano-Phase](https://thywquake.github.io/Piano-Phase)
 
+## Local Running Instructions
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+To set up and run the project locally, you need Node.js installed on your system.
+
+**Prerequisites:** Node.js
+
+1.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+2.  **Run the development server:**
+    ```bash
+    npm run dev
+    ```
+3.  The application will typically be available at `http://localhost:3000` or a similar port.
+
+## Contact & Source Code
+
+If you have any questions, suggestions, or want to contribute, please refer to the main repository:
+
+- **Source Code (GitHub Repository):** [https://github.com/ThywQuake/Piano-Phase](https://github.com/ThywQuake/Piano-Phase)
+- **Developer Contact:** thywquake@foxmail.com
