@@ -11,22 +11,32 @@ class SoundEngine {
   private timerID: number | null = null;
   
   // Phasing parameters
-  private bpm: number = 280; // Default BPM
+  private bpm: number = 280; 
   private cyclesToPhase: number = 40;
   private startTime: number = 0;
   private pauseTime: number = 0;
   private totalOffset: number = 0;
+
+  // 乐器与音效状态
   private currentInstrument: InstrumentConfig = INSTRUMENTS[0];
+  // 新增：当前音符衰减时间（Duration），默认为第一个乐器的 decay
+  private currentDecay: number = INSTRUMENTS[0].envelope.decay;
 
   constructor() {
-    // Lazy init in start()
   }
 
   public setInstrument(instrumentId: string) {
     const inst = INSTRUMENTS.find(i => i.id === instrumentId);
     if (inst) {
       this.currentInstrument = inst;
+      // 切换乐器时，重置 Duration 为该乐器的默认值
+      this.currentDecay = inst.envelope.decay;
     }
+  }
+
+  // 新增：允许外部直接控制 Decay 时间
+  public setDecay(seconds: number) {
+    this.currentDecay = seconds;
   }
 
   public getBpm(): number {
@@ -36,26 +46,16 @@ class SoundEngine {
   public setBpm(newBpm: number) {
     if (newBpm <= 0) return;
     
-    // If playing or paused, we need to adjust anchors to prevent jumping
     if (this.ctx) {
-        // 1. Calculate current progress
-        const currentState = this.getCurrentState(); // { p1, p2 }
+        const currentState = this.getCurrentState(); 
         const p1 = currentState.p1;
         
-        // 2. Update BPM
         this.bpm = newBpm;
-        
-        // 3. Re-calculate startTime so that visual progress remains exactly p1
-        // p1 = (elapsed % loopDur) / loopDur
-        // We want (effectiveNow - newStartTime) % newLoopDur = p1 * newLoopDur
-        // To simplify, we reset the "epoch" to match exactly the current progress
         
         const newLoopDur = this.getLoopDuration();
         const now = this.ctx.currentTime;
         const effectiveNow = this.isPlaying ? now : this.pauseTime;
         
-        // We set a new start time such that effectiveNow is exactly `p1 * newLoopDur` into a loop
-        // We effectively discard previous totalOffset history and re-anchor
         this.startTime = effectiveNow - (p1 * newLoopDur);
         this.totalOffset = 0;
     } else {
@@ -90,7 +90,6 @@ class SoundEngine {
     this.noteIndex1 = 0;
     this.noteIndex2 = 0;
     
-    // Handle resume vs fresh start
     const now = this.ctx!.currentTime;
     if (this.pauseTime > 0) {
       this.totalOffset += (now - this.pauseTime);
@@ -128,7 +127,6 @@ class SoundEngine {
   private scheduler = () => {
     if (!this.isPlaying || !this.ctx) return;
 
-    // Lookahead: 100ms
     const scheduleAheadTime = 0.1;
 
     while (this.nextNoteTime1 < this.ctx.currentTime + scheduleAheadTime) {
@@ -155,8 +153,6 @@ class SoundEngine {
     osc.frequency.value = note.frequency;
     osc.type = this.currentInstrument.oscillatorType;
     
-    // Simple envelope
-    // Voice 1: Panned Left-ish, Voice 2: Panned Right-ish
     const panner = this.ctx.createStereoPanner();
     panner.pan.value = voice === 1 ? -0.3 : 0.3;
 
@@ -164,15 +160,17 @@ class SoundEngine {
     panner.connect(gain);
     gain.connect(this.ctx.destination);
 
-    const { attack, decay } = this.currentInstrument.envelope;
+    // 修改：使用 this.currentDecay 而不是 instrument.envelope.decay
+    const { attack } = this.currentInstrument.envelope;
+    const decay = this.currentDecay; 
     const peakGain = 0.4 * this.currentInstrument.gainMulti;
-    
+
     osc.start(time);
     gain.gain.setValueAtTime(0, time);
     gain.gain.linearRampToValueAtTime(peakGain, time + attack); 
     gain.gain.exponentialRampToValueAtTime(0.001, time + attack + decay);
     
-    // Longer release to avoid clicks
+    // 停止时间也需要随 decay 动态调整
     osc.stop(time + attack + decay + 0.1);
   }
 
@@ -191,7 +189,6 @@ class SoundEngine {
     this.noteIndex2++;
   }
 
-  // Used for UI synchronization
   public getCurrentState() {
     if (!this.ctx) return { p1: 0, p2: 0 };
     
