@@ -4,6 +4,13 @@ import { MusicStaff } from './components/MusicStaff';
 import { soundEngine } from './services/SoundEngine';
 import { MELODY, NOTE_COUNT, INSTRUMENTS } from './constants';
 
+// Declare MathJax for TypeScript
+declare global {
+  interface Window {
+    MathJax: any;
+  }
+}
+
 // GitHub Corner Component
 const GithubCorner = ({ url }: { url: string }) => (
   <a 
@@ -75,19 +82,35 @@ const App: React.FC = () => {
   
   const rafRef = useRef<number | null>(null);
 
-  // --- Chaos Calculation Logic ---
-  const calculateChaos = (p1: number, p2: number, windowSeconds: number) => {
+  // Trigger MathJax when Info modal opens
+  useEffect(() => {
+    if (isInfoOpen && window.MathJax) {
+      // Use setTimeout to ensure DOM is updated before typesetting
+      setTimeout(() => {
+        window.MathJax.typesetPromise && window.MathJax.typesetPromise();
+      }, 50);
+    }
+  }, [isInfoOpen]);
+
+  // --- Chaos Calculation Logic (Rhythmic Irregularity) ---
+  const calculateChaos = (p1: number, p2: number, windowTotal: number) => {
     const loopDur = soundEngine.getLoopDuration();
     const p1Pos = p1 * loopDur; 
     const p2Pos = p2 * loopDur; 
     const timestamps: number[] = [];
+    
+    // Use half window for left/right lookahead
+    const halfWindow = windowTotal / 2;
 
     const addNotes = (currentPos: number) => {
-      [-1, 0].forEach(loopOffset => {
+      // Check 3 loops to ensure we cover the window across loop boundaries
+      [-1, 0, 1].forEach(loopOffset => {
         for (let i = 0; i < NOTE_COUNT; i++) {
             const noteTime = (i / NOTE_COUNT) * loopDur + (loopOffset * loopDur);
             const relativeTime = noteTime - currentPos;
-            if (relativeTime > -windowSeconds && relativeTime <= 0.05) {
+            
+            // NEW: Record Window (Centered) [-halfWindow, +halfWindow]
+            if (Math.abs(relativeTime) <= halfWindow) {
                 timestamps.push(relativeTime);
             }
         }
@@ -97,20 +120,42 @@ const App: React.FC = () => {
     addNotes(p1Pos);
     addNotes(p2Pos);
 
-    if (timestamps.length === 0) return 0;
+    if (timestamps.length < 2) return 0;
     timestamps.sort((a, b) => a - b);
 
-    let events = 0;
-    let lastTime = -9999;
-    const CHORD_THRESHOLD = 0.06;
-
-    for (const t of timestamps) {
-        if (t - lastTime > CHORD_THRESHOLD) {
-            events++;
-            lastTime = t;
+    // 1. Auditory Fusion: Merge events closer than 50ms
+    const fusedEvents: number[] = [];
+    if (timestamps.length > 0) {
+        fusedEvents.push(timestamps[0]);
+        for (let i = 1; i < timestamps.length; i++) {
+            const diff = timestamps[i] - timestamps[i-1];
+            if (diff > 0.01) { // 50ms Threshold
+                fusedEvents.push(timestamps[i]);
+            }
         }
     }
-    return events;
+    
+    if (fusedEvents.length < 2) return 0;
+
+    // 2. Calculate IOIs (Inter-Onset Intervals)
+    const iois: number[] = [];
+    for (let i = 0; i < fusedEvents.length - 1; i++) {
+        iois.push(fusedEvents[i+1] - fusedEvents[i]);
+    }
+
+    // 3. Calculate Coefficient of Variation (CV)
+    // High CV = Irregular Rhythm (Chaos)
+    // Low CV = Regular Rhythm (Peace)
+    const mean = iois.reduce((a, b) => a + b, 0) / iois.length;
+    if (mean === 0) return 0;
+
+    const variance = iois.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / iois.length;
+    const sd = Math.sqrt(variance);
+    const cv = sd / mean;
+
+    // Scale to 0-100
+    // Theoretically max CV for a 2-event cycle is 1.0 (when one interval -> 0)
+    return Math.min(100, Math.round(cv * 100));
   };
 
   const updateLoop = useCallback(() => {
@@ -204,7 +249,8 @@ const App: React.FC = () => {
 
   // Shared Chaos Meter Content
   const renderChaosMeter = (isVertical: boolean) => {
-    const percent = Math.min(100, (chaosScore / 30) * 100);
+    // Percent is now directly the score (0-100)
+    const percent = chaosScore;
     return (
       <div className={`flex ${isVertical ? 'flex-col items-center py-4' : 'flex-row items-center px-4 py-3'} h-full w-full bg-white rounded-2xl shadow-sm border border-stone-200 relative gap-4`}>
           <div 
@@ -251,7 +297,7 @@ const App: React.FC = () => {
                       onClick={(e) => e.stopPropagation()}
                       className={`absolute z-20 bg-stone-800 text-white p-3 rounded-lg shadow-xl w-48 ${isVertical ? 'right-full top-1/2 -translate-y-1/2 mr-3' : 'bottom-full right-0 mb-3'}`}
                   >
-                      <div className="text-xs font-bold mb-2">History Window: {chaosWindow}s</div>
+                      <div className="text-xs font-bold mb-2">Record Window: {chaosWindow}s</div>
                       <input 
                           type="range" min="0.5" max="5.0" step="0.5"
                           value={chaosWindow}
@@ -274,7 +320,7 @@ const App: React.FC = () => {
       {/* Modal for Info */}
       {isInfoOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 relative">
                 <button onClick={() => setIsInfoOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-stone-800">
                     <X size={20}/>
                 </button>
@@ -282,16 +328,31 @@ const App: React.FC = () => {
                     <Info size={20} className="text-blue-500"/>
                     Auditory Density Calculation
                 </h2>
-                <div className="text-sm text-stone-600 space-y-3">
-                    <p>The <strong>Auditory Density</strong> meter visualizes the perceived "chaos" or complexity of the combined musical pattern.</p>
-                    <div className="bg-stone-50 p-3 rounded border border-stone-200 font-mono text-xs">
-                        Density = Unique Sound Events / Time Window
+                <div className="text-sm text-stone-600 space-y-4">
+                    <p>The <strong>Auditory Density</strong> meter quantifies the rhythmic irregularity within a sliding time window centered on the current moment.</p>
+                    
+                    <div className="bg-stone-50 p-4 rounded border border-stone-200 text-xs">
+                        <p className="mb-2 font-semibold text-stone-500 uppercase tracking-wider">Formula: Coefficient of Variation (CV)</p>
+                        <div className="overflow-x-auto py-2">
+                             {/* LaTeX Formulae */}
+                             <div>
+                                {"$$ Density = \\min \\left( 100, \\frac{\\sigma}{\\mu} \\times 100 \\right) $$"}
+                             </div>
+                             <div className="mt-2">
+                                {"$$ \\mu = \\frac{1}{N} \\sum_{i=1}^{N} \\Delta t_i $$"}
+                             </div>
+                             <div className="mt-2">
+                                {"$$ \\sigma = \\sqrt{\\frac{1}{N} \\sum_{i=1}^{N} (\\Delta t_i - \\mu)^2} $$"}
+                             </div>
+                        </div>
+                        <div className="mt-2 text-stone-400 italic">
+                            Where {"$\\Delta t_i$"} are the Inter-Onset Intervals (IOIs) between consecutive sound events in the window {"$[t - w/2, t + w/2]$"}.
+                        </div>
                     </div>
+
                     <ul className="list-disc list-inside space-y-1">
-                        <li>It looks back at the last <strong>{chaosWindow} seconds</strong> of the music.</li>
-                        <li>It counts how many distinct attacks occur.</li>
-                        <li>If two notes from different voices occur within <strong>60ms</strong> of each other, they are perceived as a single "chord" event (less chaotic).</li>
-                        <li>If they drift apart, they become two separate events (more chaotic).</li>
+                         <li><strong>Low Density (Green)</strong>: $\sigma \approx 0$. Events are evenly spaced (Isochronous). Occurs during <span className="text-emerald-600 font-bold">Unison</span> or <span className="text-emerald-600 font-bold">Perfect Interlocking</span>.</li>
+                         <li><strong>High Density (Red)</strong>: $\sigma \gg 0$. Events are irregularly spaced. Occurs during <span className="text-rose-500 font-bold">Phasing Transitions</span>.</li>
                     </ul>
                 </div>
             </div>
