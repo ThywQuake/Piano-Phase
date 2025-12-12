@@ -377,7 +377,7 @@ const App: React.FC = () => {
             {/* Header */}
             <div className="mb-6 flex justify-between items-end border-b border-stone-200 pb-4">
                 <div>
-                    <h1 className="text-3xl font-light tracking-tight text-stone-800">Piano Phase</h1>
+                    <h1 className="text-3xl font-bold tracking-tight text-stone-800">Piano Phase</h1>
                     <p className="text-stone-500 text-sm italic mt-1">Steve Reich (1967)</p>
                 </div>
                 <div className="flex flex-col items-end">
