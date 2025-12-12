@@ -1,4 +1,5 @@
-import { MELODY } from '../constants';
+import { MELODY, INSTRUMENTS } from '../constants';
+import { InstrumentConfig } from '../types';
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
@@ -15,9 +16,17 @@ class SoundEngine {
   private startTime: number = 0;
   private pauseTime: number = 0;
   private totalOffset: number = 0;
+  private currentInstrument: InstrumentConfig = INSTRUMENTS[0];
 
   constructor() {
     // Lazy init in start()
+  }
+
+  public setInstrument(instrumentId: string) {
+    const inst = INSTRUMENTS.find(i => i.id === instrumentId);
+    if (inst) {
+      this.currentInstrument = inst;
+    }
   }
 
   public getBpm(): number {
@@ -144,6 +153,7 @@ class SoundEngine {
     const note = MELODY[index % MELODY.length];
     
     osc.frequency.value = note.frequency;
+    osc.type = this.currentInstrument.oscillatorType;
     
     // Simple envelope
     // Voice 1: Panned Left-ish, Voice 2: Panned Right-ish
@@ -154,14 +164,15 @@ class SoundEngine {
     panner.connect(gain);
     gain.connect(this.ctx.destination);
 
-    // Click-free envelope
-    const attack = 0.01;
-    const decay = 0.15;
+    const { attack, decay } = this.currentInstrument.envelope;
+    const peakGain = 0.4 * this.currentInstrument.gainMulti;
     
     osc.start(time);
     gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(voice === 1 ? 0.4 : 0.4, time + attack); 
+    gain.gain.linearRampToValueAtTime(peakGain, time + attack); 
     gain.gain.exponentialRampToValueAtTime(0.001, time + attack + decay);
+    
+    // Longer release to avoid clicks
     osc.stop(time + attack + decay + 0.1);
   }
 

@@ -16,3 +16,16 @@ export enum PlayerColor {
   P2 = '#dc2626', // Red-600
   Fusion = '#7e22ce', // Purple-700
 }
+
+export interface InstrumentConfig {
+  id: string;
+  name: string;
+  oscillatorType: OscillatorType; // 'sine' | 'square' | 'sawtooth' | 'triangle'
+  envelope: {
+    attack: number;
+    decay: number;
+    sustain?: number;
+    release?: number;
+  };
+  gainMulti: number;
+}
