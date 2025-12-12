@@ -9,6 +9,10 @@ interface MusicStaffProps {
   mode: 'p1' | 'p2' | 'fusion';
   dividerY?: number; // 0-1 relative to height
   onDividerDrag?: (newY: number) => void;
+  // 新增：用于可视化计算窗口
+  chaosWindow?: number; // 窗口总时长 (秒)
+  futureWindow?: number; // 未来预测时长 (秒)
+  bpm?: number;         // 当前 BPM
 }
 
 const STAFF_HEIGHT = 100;
@@ -24,15 +28,16 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
   progressP2,
   mode,
   dividerY,
-  onDividerDrag
+  onDividerDrag,
+  chaosWindow,
+  futureWindow,
+  bpm
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   // Groups logic
   // We need to know which notes belong to which group to draw beams
-  // MELODY is 12 notes. GROUP_SIZE = 6.
-  // Group 1: 0-5. Group 2: 6-11.
   const groups = useMemo(() => {
     const g = [];
     for (let i = 0; i < NOTE_COUNT; i += GROUP_SIZE) {
@@ -48,8 +53,38 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
 
   const lines = [0, 1, 2, 3, 4].map(i => BASE_Y - i * LINE_SPACING);
 
-  const PLAYHEAD_X = 150;
+  // 指示线位于黄金分割点 (左侧 0.382)
+  const PLAYHEAD_X = 306;
+  
   const LOOP_PIXEL_WIDTH = 400 * VISIBLE_WINDOW_SCALE; 
+
+  // Mask 计算逻辑更新：接收 futureWindow
+  const maskGeometry = useMemo(() => {
+    if (!chaosWindow || !bpm || futureWindow === undefined) return null;
+    
+    // 1. 计算一拍多少秒
+    const secondsPerBeat = 60.0 / bpm;
+    // 2. 计算整个循环（12个音符）多少秒
+    const loopDuration = secondsPerBeat * NOTE_COUNT;
+    // 3. 计算每秒对应多少像素
+    const pixelsPerSecond = LOOP_PIXEL_WIDTH / loopDuration;
+    
+    // 使用传入的 futureWindow，默认为 0.5 以防万一
+    const fut = futureWindow;
+    const past = Math.max(0, chaosWindow - fut);
+
+    const futurePixels = fut * pixelsPerSecond;
+    const pastPixels = past * pixelsPerSecond;
+    const totalWidth = futurePixels + pastPixels;
+
+    // x 是矩形左边缘位置。
+    // Playhead 在 PLAYHEAD_X。
+    // 左边缘应该在 PLAYHEAD_X - pastPixels
+    return {
+        x: PLAYHEAD_X - pastPixels,
+        width: totalWidth
+    };
+  }, [chaosWindow, futureWindow, bpm, LOOP_PIXEL_WIDTH]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (onDividerDrag) {
@@ -62,7 +97,6 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
     if (isDragging && onDividerDrag && svgRef.current) {
       const rect = svgRef.current.getBoundingClientRect();
       const y = e.clientY - rect.top;
-      // Clamp
       const clampedY = Math.max(0, Math.min(STAFF_HEIGHT, y));
       onDividerDrag(clampedY / STAFF_HEIGHT);
     }
@@ -75,37 +109,25 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
     }
   };
 
-  // Render a set of beamed notes
   const renderBeamedGroup = (group: {note: Note, index: number, relX: number, y: number}[], progress: number, color: string, loopOffset: number) => {
-    
-    // We calculate the X position for the first note to see if the group is visible
-    // But we need individual Xs
-    
     const notesWithPos = group.map(n => {
        const totalRelX = (n.relX + loopOffset) - progress;
        const x = PLAYHEAD_X + totalRelX * LOOP_PIXEL_WIDTH;
        return { ...n, x };
     });
 
-    // Check visibility (loose bound)
     if (notesWithPos[notesWithPos.length-1].x < -50 || notesWithPos[0].x > STAFF_WIDTH + 50) return null;
 
-    // Calculate Beam Y
-    // For this melody, notes are mostly high. Let's put beam above.
-    // Find min Y (highest point)
     const minY = Math.min(...notesWithPos.map(n => n.y));
     const beamY = minY - STEM_HEIGHT;
 
     return (
       <g key={`group-${loopOffset}-${group[0].index}`}>
-        {/* Beam */}
         <line 
           x1={notesWithPos[0].x} y1={beamY} 
           x2={notesWithPos[notesWithPos.length-1].x} y2={beamY}
           stroke={color} strokeWidth="4"
         />
-        
-        {/* Notes and Stems */}
         {notesWithPos.map(n => (
           <g key={n.index}>
              <line 
@@ -138,7 +160,18 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
-          {/* Playhead Marker (Fixed) */}
+          {/* Mask: 非对称区域 */}
+          {maskGeometry && (
+            <rect 
+                x={maskGeometry.x}
+                y={0}
+                width={maskGeometry.width}
+                height={STAFF_HEIGHT}
+                fill="rgba(250, 204, 21, 0.2)" // Yellow-400, 20% opacity
+            />
+          )}
+
+          {/* Playhead Marker (黄金分割位) */}
           <line 
               x1={PLAYHEAD_X} y1={0} x2={PLAYHEAD_X} y2={STAFF_HEIGHT} 
               stroke="rgba(255,0,0,0.3)" strokeWidth="2" strokeDasharray="4 2" 
@@ -155,16 +188,13 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
               ))}
           </g>
           
-          {/* Clef */}
           <text x={10} y={BASE_Y - 10} fontSize="32" fill="#d1d5db" style={{ fontFamily: 'serif' }}>𝄞</text>
 
-          {/* Draggable Divider Line (High/Low) */}
           {dividerY !== undefined && (
               <g transform={`translate(0, ${dividerY * STAFF_HEIGHT})`}
                   onPointerDown={handlePointerDown}
                   className="cursor-row-resize"
               >
-                  {/* Hit area for easier grabbing */}
                   <rect x="0" y="-10" width={STAFF_WIDTH} height="20" fill="transparent" />
                   <line 
                       x1={0} y1={0} x2={STAFF_WIDTH} y2={0} 
@@ -174,7 +204,6 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
               </g>
           )}
 
-          {/* Notes */}
           {[-1, 0, 1, 2].map(loopOffset => (
               <g key={loopOffset}>
                   {mode === 'p1' && groups.map(g => renderBeamedGroup(g, progressP1, PlayerColor.P1, loopOffset))}

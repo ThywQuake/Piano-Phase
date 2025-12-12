@@ -71,21 +71,21 @@ const App: React.FC = () => {
   const [p1Progress, setP1Progress] = useState(0);
   const [p2Progress, setP2Progress] = useState(0);
   
-  // Visual states
-  const [dividerY, setDividerY] = useState(0.45); 
+  const [dividerY, setDividerY] = useState(0.62); 
   
   // Chaos Meter State
   const [chaosScore, setChaosScore] = useState(0);
-  const [chaosWindow, setChaosWindow] = useState(2.0); 
+  const [chaosWindow, setChaosWindow] = useState(0.5); // Total window
+  const [futureWindow, setFutureWindow] = useState(0.2); // Future part
+  const [fusionThreshold, setFusionThreshold] = useState(0.025);
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   
   const rafRef = useRef<number | null>(null);
 
-  // Trigger MathJax when Info modal opens
   useEffect(() => {
     if (isInfoOpen && window.MathJax) {
-      // Use setTimeout to ensure DOM is updated before typesetting
       setTimeout(() => {
         window.MathJax.typesetPromise && window.MathJax.typesetPromise();
       }, 50);
@@ -93,24 +93,26 @@ const App: React.FC = () => {
   }, [isInfoOpen]);
 
   // --- Chaos Calculation Logic (Rhythmic Irregularity) ---
-  const calculateChaos = (p1: number, p2: number, windowTotal: number) => {
+  const calculateChaos = (p1: number, p2: number, windowTotal: number, future: number, threshold: number) => {
     const loopDur = soundEngine.getLoopDuration();
     const p1Pos = p1 * loopDur; 
     const p2Pos = p2 * loopDur; 
     const timestamps: number[] = [];
     
-    // Use half window for left/right lookahead
-    const halfWindow = windowTotal / 2;
+    // 非对称窗口
+    // 过去：(windowTotal - future)
+    // 未来：future
+    const futureLimit = future;
+    const pastLimit = Math.max(0, windowTotal - futureLimit);
 
     const addNotes = (currentPos: number) => {
-      // Check 3 loops to ensure we cover the window across loop boundaries
       [-1, 0, 1].forEach(loopOffset => {
         for (let i = 0; i < NOTE_COUNT; i++) {
             const noteTime = (i / NOTE_COUNT) * loopDur + (loopOffset * loopDur);
             const relativeTime = noteTime - currentPos;
             
-            // NEW: Record Window (Centered) [-halfWindow, +halfWindow]
-            if (Math.abs(relativeTime) <= halfWindow) {
+            // NEW: Record Window [ -pastLimit, +futureLimit ]
+            if (relativeTime >= -pastLimit && relativeTime <= futureLimit) {
                 timestamps.push(relativeTime);
             }
         }
@@ -123,13 +125,13 @@ const App: React.FC = () => {
     if (timestamps.length < 2) return 0;
     timestamps.sort((a, b) => a - b);
 
-    // 1. Auditory Fusion: Merge events closer than 50ms
+    // 1. Auditory Fusion
     const fusedEvents: number[] = [];
     if (timestamps.length > 0) {
         fusedEvents.push(timestamps[0]);
         for (let i = 1; i < timestamps.length; i++) {
             const diff = timestamps[i] - timestamps[i-1];
-            if (diff > 0.01) { // 50ms Threshold
+            if (diff > threshold) { 
                 fusedEvents.push(timestamps[i]);
             }
         }
@@ -137,15 +139,13 @@ const App: React.FC = () => {
     
     if (fusedEvents.length < 2) return 0;
 
-    // 2. Calculate IOIs (Inter-Onset Intervals)
+    // 2. Calculate IOIs
     const iois: number[] = [];
     for (let i = 0; i < fusedEvents.length - 1; i++) {
         iois.push(fusedEvents[i+1] - fusedEvents[i]);
     }
 
-    // 3. Calculate Coefficient of Variation (CV)
-    // High CV = Irregular Rhythm (Chaos)
-    // Low CV = Regular Rhythm (Peace)
+    // 3. Calculate CV
     const mean = iois.reduce((a, b) => a + b, 0) / iois.length;
     if (mean === 0) return 0;
 
@@ -153,8 +153,6 @@ const App: React.FC = () => {
     const sd = Math.sqrt(variance);
     const cv = sd / mean;
 
-    // Scale to 0-100
-    // Theoretically max CV for a 2-event cycle is 1.0 (when one interval -> 0)
     return Math.min(100, Math.round(cv * 100));
   };
 
@@ -163,13 +161,14 @@ const App: React.FC = () => {
     setP1Progress(p1);
     setP2Progress(p2);
 
-    const score = calculateChaos(p1, p2, chaosWindow);
+    // Update with dynamic futureWindow
+    const score = calculateChaos(p1, p2, chaosWindow, futureWindow, fusionThreshold);
     setChaosScore(score);
     
     if (isPlaying) {
       rafRef.current = requestAnimationFrame(updateLoop);
     }
-  }, [isPlaying, chaosWindow]);
+  }, [isPlaying, chaosWindow, futureWindow, fusionThreshold]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -228,7 +227,6 @@ const App: React.FC = () => {
       soundEngine.setDecay(val);
   };
 
-  // Phase Calculation
   let rawDiff = p2Progress - p1Progress;
   if (rawDiff < 0) rawDiff += 1;
   const notesDiff = rawDiff * NOTE_COUNT;
@@ -247,9 +245,7 @@ const App: React.FC = () => {
     }
   }
 
-  // Shared Chaos Meter Content
   const renderChaosMeter = (isVertical: boolean) => {
-    // Percent is now directly the score (0-100)
     const percent = chaosScore;
     return (
       <div className={`flex ${isVertical ? 'flex-col items-center py-4' : 'flex-row items-center px-4 py-3'} h-full w-full bg-white rounded-2xl shadow-sm border border-stone-200 relative gap-4`}>
@@ -295,13 +291,30 @@ const App: React.FC = () => {
               {isSettingsOpen && (
                   <div 
                       onClick={(e) => e.stopPropagation()}
-                      className={`absolute z-20 bg-stone-800 text-white p-3 rounded-lg shadow-xl w-48 ${isVertical ? 'right-full top-1/2 -translate-y-1/2 mr-3' : 'bottom-full right-0 mb-3'}`}
+                      className={`absolute z-20 bg-stone-800 text-white p-3 rounded-lg shadow-xl w-56 ${isVertical ? 'right-full top-1/2 -translate-y-1/2 mr-3' : 'bottom-full right-0 mb-3'}`}
                   >
-                      <div className="text-xs font-bold mb-2">Record Window: {chaosWindow}s</div>
+                      <div className="text-xs font-bold mb-2">Total Window: {chaosWindow}s</div>
                       <input 
-                          type="range" min="0.5" max="5.0" step="0.5"
+                          type="range" min="0.3" max="2.0" step="0.1"
                           value={chaosWindow}
                           onChange={(e) => setChaosWindow(parseFloat(e.target.value))}
+                          className="w-full h-1 bg-stone-600 rounded appearance-none cursor-pointer accent-white mb-4"
+                      />
+                      
+                      {/* 新增: Future Prediction Slider */}
+                      <div className="text-xs font-bold mb-2">Future Prediction: {futureWindow}s</div>
+                      <input 
+                          type="range" min="0.01" max="0.3" step="0.01"
+                          value={futureWindow}
+                          onChange={(e) => setFutureWindow(parseFloat(e.target.value))}
+                          className="w-full h-1 bg-stone-600 rounded appearance-none cursor-pointer accent-white mb-4"
+                      />
+
+                      <div className="text-xs font-bold mb-2">Fusion Threshold: {Math.round(fusionThreshold * 1000)}ms</div>
+                      <input 
+                          type="range" min="0.005" max="0.100" step="0.005"
+                          value={fusionThreshold}
+                          onChange={(e) => setFusionThreshold(parseFloat(e.target.value))}
                           className="w-full h-1 bg-stone-600 rounded appearance-none cursor-pointer accent-white"
                       />
                   </div>
@@ -334,7 +347,6 @@ const App: React.FC = () => {
                     <div className="bg-stone-50 p-4 rounded border border-stone-200 text-xs">
                         <p className="mb-2 font-semibold text-stone-500 uppercase tracking-wider">Formula: Coefficient of Variation (CV)</p>
                         <div className="overflow-x-auto py-2">
-                             {/* LaTeX Formulae */}
                              <div>
                                 {"$$ Density = \\min \\left( 100, \\frac{\\sigma}{\\mu} \\times 100 \\right) $$"}
                              </div>
@@ -346,7 +358,8 @@ const App: React.FC = () => {
                              </div>
                         </div>
                         <div className="mt-2 text-stone-400 italic">
-                            Where {"$\\Delta t_i$"} are the Inter-Onset Intervals (IOIs) between consecutive sound events in the window {"$[t - w/2, t + w/2]$"}.
+                            {/* Update: Dynamic formula text */}
+                            Where {"$\\Delta t_i$"} are the Inter-Onset Intervals (IOIs) between consecutive sound events (fused if {"$< " + Math.round(fusionThreshold * 1000) + "ms$"}) in the window {"$[t - " + (chaosWindow - futureWindow).toFixed(2) + ", t + " + futureWindow + "]$"}.
                         </div>
                     </div>
 
@@ -385,12 +398,18 @@ const App: React.FC = () => {
                     progressP1={p1Progress} 
                     progressP2={p2Progress}
                     mode="p1"
+                    chaosWindow={chaosWindow}
+                    futureWindow={futureWindow}
+                    bpm={bpm}
                 />
                 <MusicStaff 
                     label="Player 2 (Phasing)" 
                     progressP1={p1Progress} 
                     progressP2={p2Progress}
                     mode="p2"
+                    chaosWindow={chaosWindow}
+                    futureWindow={futureWindow}
+                    bpm={bpm}
                 />
                 <div className="relative pt-6">
                      <div className="absolute top-0 left-10 right-10 h-6 border-l border-r border-t border-dashed border-stone-300 rounded-t-xl"></div>
@@ -404,6 +423,9 @@ const App: React.FC = () => {
                         mode="fusion"
                         dividerY={dividerY}
                         onDividerDrag={setDividerY}
+                        chaosWindow={chaosWindow}
+                        futureWindow={futureWindow}
+                        bpm={bpm}
                     />
                 </div>
             </div>
@@ -489,25 +511,44 @@ const App: React.FC = () => {
 
             {/* Description Section - Removed bottom link as requested */}
             <div className="mt-12 border-t border-stone-200 pt-8 pb-8">
-                <div className="flex flex-col gap-6 max-w-4xl">
-                    <div className="flex items-start gap-4">
-                        <div className="p-3 bg-stone-100 rounded-full text-stone-500 hidden sm:block">
-                            <Music size={24} />
-                        </div>
-                        <div className="flex-1">
-                            <h2 className="text-xl font-bold text-stone-800 mb-2">About Piano Phase</h2>
-                            <div className="prose prose-stone text-sm text-stone-600 leading-relaxed space-y-3">
-                                <p>
-                                    <strong>Piano Phase</strong> (1967) is one of the first and most famous examples of minimalism in music, composed by 
-                                    Steve Reich. It employs a technique called <span className="text-stone-800 font-semibold">phasing</span>.
-                                </p>
-                                <p>
-                                    Two pianists begin by playing the same repeating twelve-note melody in unison. One pianist keeps a steady tempo, 
-                                    while the other gradually accelerates until they are playing slightly faster. As the second pianist pulls ahead, 
-                                    the two melodies shift out of sync, creating a series of complex, ever-changing rhythmic patterns and resulting harmonies.
-                                </p>
+                {/* 更改：将原先的 flex-col 容器改为 flex-row，并保持 max-w-4xl 约束，以容纳右侧的头像 */}
+                <div className="flex flex-row justify-between items-start gap-6 max-w-4xl mx-auto"> 
+                    
+                    {/* 左侧文字/图标内容块 (flex-1 确保它占据大部分空间) */}
+                    <div className="flex-1">
+                        <div className="flex items-start gap-4">
+                            <div className="p-3 bg-stone-100 rounded-full text-stone-500 hidden sm:block">
+                                <Music size={24} />
+                            </div>
+                            <div className="flex-1">
+                                <h2 className="text-xl font-bold text-stone-800 mb-2">About Piano Phase</h2>
+                                <div className="prose prose-stone text-sm text-stone-600 leading-relaxed space-y-3">
+                                    <p>
+                                        <strong>Piano Phase</strong> (1967) is one of the first and most famous examples of minimalism in music, composed by 
+                                        Steve Reich. It employs a technique called <span className="text-stone-800 font-semibold">phasing</span>.
+                                    </p>
+                                    <p>
+                                        Two pianists begin by playing the same repeating twelve-note melody in unison. One pianist keeps a steady tempo, 
+                                        while the other gradually accelerates until they are playing slightly faster. As the second pianist pulls ahead, 
+                                        the two melodies shift out of sync, creating a series of complex, ever-changing rhythmic patterns and resulting harmonies.
+                                    </p>
+                                </div>
                             </div>
                         </div>
+                    </div>
+                    
+                    {/* 右侧头像 (hidden sm:block: 在小屏幕上隐藏，只在足够大的屏幕上显示) */}
+                    <div className="shrink-0 hidden sm:block pt-2 flex flex-col items-center">
+                        <a href="https://stevereich.com/" target="_blank" rel="noopener noreferrer" className="flex flex-col items-center group">
+                            <img 
+                                src="./icon.jpeg" 
+                                alt="Steve Reich Portrait" 
+                                className="w-32 h-32 rounded-full object-cover shadow-xl border-4 border-white transition-all group-hover:shadow-2xl group-hover:border-stone-200"
+                            />
+                            <div className="mt-2 text-sm font-semibold text-stone-700 group-hover:text-blue-600 transition-colors">
+                                Steve Reich
+                            </div>
+                        </a>
                     </div>
                 </div>
             </div>
