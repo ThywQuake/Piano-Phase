@@ -235,10 +235,12 @@ const App: React.FC = () => {
   const distToHalf = Math.abs(notesDiff - nearestHalf);
   const isHighlight = distToHalf < 0.05; 
   
+  // 修改：提取 isIntegerPhase 变量，用于传递给子组件
+  const isIntegerPhase = isHighlight && (Math.abs(nearestHalf % 1) < 0.01);
+
   let phaseColorClass = "text-stone-400";
   if (isHighlight) {
-    const isInteger = Math.abs(nearestHalf % 1) < 0.01;
-    if (isInteger) {
+    if (isIntegerPhase) {
          phaseColorClass = "text-emerald-500 font-bold scale-110";
     } else {
          phaseColorClass = "text-rose-500 font-bold scale-105";
@@ -416,6 +418,7 @@ const App: React.FC = () => {
                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-stone-50 px-2 text-xs text-stone-400 uppercase tracking-widest">
                         Acoustic Result
                      </div>
+                     {/* 修改：传入 highlight={isIntegerPhase} */}
                     <MusicStaff 
                         label="Fusion" 
                         progressP1={p1Progress} 
@@ -426,6 +429,7 @@ const App: React.FC = () => {
                         chaosWindow={chaosWindow}
                         futureWindow={futureWindow}
                         bpm={bpm}
+                        highlight={isIntegerPhase}
                     />
                 </div>
             </div>
@@ -509,12 +513,11 @@ const App: React.FC = () => {
                 </div>
             </div>
 
-            {/* Description Section - Removed bottom link as requested */}
+            {/* Description Section */}
             <div className="mt-12 border-t border-stone-200 pt-8 pb-8">
-                {/* 更改：将原先的 flex-col 容器改为 flex-row，并保持 max-w-4xl 约束，以容纳右侧的头像 */}
                 <div className="flex flex-row justify-between items-start gap-6 max-w-4xl mx-auto"> 
                     
-                    {/* 左侧文字/图标内容块 (flex-1 确保它占据大部分空间) */}
+                    {/* 左侧文字/图标内容块 */}
                     <div className="flex-1">
                         <div className="flex items-start gap-4">
                             <div className="p-3 bg-stone-100 rounded-full text-stone-500 hidden sm:block">
@@ -537,7 +540,7 @@ const App: React.FC = () => {
                         </div>
                     </div>
                     
-                    {/* 右侧头像 (hidden sm:block: 在小屏幕上隐藏，只在足够大的屏幕上显示) */}
+                    {/* 右侧头像 */}
                     <div className="shrink-0 hidden sm:block pt-2 flex flex-col items-center">
                         <a href="https://stevereich.com/" target="_blank" rel="noopener noreferrer" className="flex flex-col items-center group">
                             <img 

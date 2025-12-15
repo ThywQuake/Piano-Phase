@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { MELODY, GROUP_SIZE, NOTE_COUNT } from '../constants';
+import { MELODY, NOTE_COUNT } from '../constants';
 import { PlayerColor, Note } from '../types';
 
 interface MusicStaffProps {
@@ -9,10 +9,10 @@ interface MusicStaffProps {
   mode: 'p1' | 'p2' | 'fusion';
   dividerY?: number; // 0-1 relative to height
   onDividerDrag?: (newY: number) => void;
-  // 新增：用于可视化计算窗口
-  chaosWindow?: number; // 窗口总时长 (秒)
-  futureWindow?: number; // 未来预测时长 (秒)
-  bpm?: number;         // 当前 BPM
+  chaosWindow?: number; 
+  futureWindow?: number; 
+  bpm?: number;
+  highlight?: boolean;       
 }
 
 const STAFF_HEIGHT = 100;
@@ -21,6 +21,17 @@ const LINE_SPACING = 8;
 const BASE_Y = 70; 
 const VISIBLE_WINDOW_SCALE = 1.0; 
 const STEM_HEIGHT = 22;
+
+// 定义分组类型
+interface NoteGroup {
+  direction: 'up' | 'down';
+  notes: {
+    note: Note;
+    index: number;
+    relX: number;
+    y: number;
+  }[];
+}
 
 export const MusicStaff: React.FC<MusicStaffProps> = ({ 
   label, 
@@ -31,45 +42,60 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
   onDividerDrag,
   chaosWindow,
   futureWindow,
-  bpm
+  bpm,
+  highlight
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   // Groups logic
-  // We need to know which notes belong to which group to draw beams
-  const groups = useMemo(() => {
-    const g = [];
-    for (let i = 0; i < NOTE_COUNT; i += GROUP_SIZE) {
-      g.push(MELODY.slice(i, i + GROUP_SIZE).map((note, idx) => ({ 
-        note, 
-        index: i + idx,
-        relX: (i + idx) / NOTE_COUNT,
-        y: BASE_Y - (note.staffY * (LINE_SPACING / 2))
-      })));
-    }
-    return g;
+  // 根据原著重构分组：交替的声部
+  const groups: NoteGroup[] = useMemo(() => {
+    // 0-based index mapping:
+    // 原著 (1, 3, 5) -> indices [0, 2, 4] -> 下方
+    // 原著 (2, 4, 6) -> indices [1, 3, 5] -> 上方
+    // 原著 (7, 9, 11) -> indices [6, 8, 10] -> 下方
+    // 原著 (8, 10, 12) -> indices [7, 9, 11] -> 上方
+
+    // const definitions = [
+    //   { indices: [0, 2, 4], direction: 'down' as const },
+    //   { indices: [1, 3, 5], direction: 'up' as const },
+    //   { indices: [6, 8, 10], direction: 'down' as const },
+    //   { indices: [7, 9, 11], direction: 'up' as const },
+    // ];
+
+    const definitions = [
+      { indices: [0, 2, 4], direction: 'down' as const },
+      { indices: [1, 3], direction: 'up' as const },
+      { indices: [6, 8, 10], direction: 'down' as const },
+      { indices: [5, 7], direction: 'up' as const },
+      { indices: [9, 11], direction: 'up' as const },
+    ]
+
+    return definitions.map(def => ({
+      direction: def.direction,
+      notes: def.indices.map(i => {
+        const note = MELODY[i];
+        return {
+          note,
+          index: i,
+          relX: i / NOTE_COUNT,
+          y: BASE_Y - (note.staffY * (LINE_SPACING / 2))
+        };
+      })
+    }));
   }, []);
 
   const lines = [0, 1, 2, 3, 4].map(i => BASE_Y - i * LINE_SPACING);
-
-  // 指示线位于黄金分割点 (左侧 0.382)
   const PLAYHEAD_X = 306;
-  
   const LOOP_PIXEL_WIDTH = 400 * VISIBLE_WINDOW_SCALE; 
 
-  // Mask 计算逻辑更新：接收 futureWindow
   const maskGeometry = useMemo(() => {
     if (!chaosWindow || !bpm || futureWindow === undefined) return null;
-    
-    // 1. 计算一拍多少秒
     const secondsPerBeat = 60.0 / bpm;
-    // 2. 计算整个循环（12个音符）多少秒
     const loopDuration = secondsPerBeat * NOTE_COUNT;
-    // 3. 计算每秒对应多少像素
     const pixelsPerSecond = LOOP_PIXEL_WIDTH / loopDuration;
     
-    // 使用传入的 futureWindow，默认为 0.5 以防万一
     const fut = futureWindow;
     const past = Math.max(0, chaosWindow - fut);
 
@@ -77,9 +103,6 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
     const pastPixels = past * pixelsPerSecond;
     const totalWidth = futurePixels + pastPixels;
 
-    // x 是矩形左边缘位置。
-    // Playhead 在 PLAYHEAD_X。
-    // 左边缘应该在 PLAYHEAD_X - pastPixels
     return {
         x: PLAYHEAD_X - pastPixels,
         width: totalWidth
@@ -109,8 +132,16 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
     }
   };
 
-  const renderBeamedGroup = (group: {note: Note, index: number, relX: number, y: number}[], progress: number, color: string, loopOffset: number) => {
-    const notesWithPos = group.map(n => {
+  // 修改：接收 direction 参数
+  const renderBeamedGroup = (
+    group: NoteGroup, 
+    progress: number, 
+    color: string, 
+    loopOffset: number
+  ) => {
+    const { notes, direction } = group;
+
+    const notesWithPos = notes.map(n => {
        const totalRelX = (n.relX + loopOffset) - progress;
        const x = PLAYHEAD_X + totalRelX * LOOP_PIXEL_WIDTH;
        return { ...n, x };
@@ -118,16 +149,27 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
 
     if (notesWithPos[notesWithPos.length-1].x < -50 || notesWithPos[0].x > STAFF_WIDTH + 50) return null;
 
-    const minY = Math.min(...notesWithPos.map(n => n.y));
-    const beamY = minY - STEM_HEIGHT;
+    // 计算符梁高度
+    let beamY;
+    if (direction === 'up') {
+        // 符杆向上：以最高音（y最小）为基准再往上
+        const minY = Math.min(...notesWithPos.map(n => n.y));
+        beamY = minY - STEM_HEIGHT;
+    } else {
+        // 符杆向下：以最低音（y最大）为基准再往下
+        const maxY = Math.max(...notesWithPos.map(n => n.y));
+        beamY = maxY + STEM_HEIGHT;
+    }
 
     return (
-      <g key={`group-${loopOffset}-${group[0].index}`}>
+      <g key={`group-${loopOffset}-${notes[0].index}`}>
+        {/* Beam (横梁) */}
         <line 
           x1={notesWithPos[0].x} y1={beamY} 
           x2={notesWithPos[notesWithPos.length-1].x} y2={beamY}
           stroke={color} strokeWidth="4"
         />
+        {/* Stems & Noteheads */}
         {notesWithPos.map(n => (
           <g key={n.index}>
              <line 
@@ -151,7 +193,11 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
       <div className="mb-1 text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">
         {label}
       </div>
-      <div className="w-full bg-white rounded-lg shadow-sm border border-gray-200 relative overflow-hidden select-none">
+      <div className={`w-full rounded-lg shadow-sm border border-gray-200 relative overflow-hidden select-none transition-all duration-500 ease-in-out ${
+        highlight 
+          ? 'bg-emerald-50 shadow-[0_0_20px_rgba(16,185,129,0.2)] border-emerald-300' 
+          : 'bg-white'
+      }`}>
         <svg 
           ref={svgRef}
           viewBox={`0 0 ${STAFF_WIDTH} ${STAFF_HEIGHT}`} 
@@ -160,24 +206,21 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
-          {/* Mask: 非对称区域 */}
           {maskGeometry && (
             <rect 
                 x={maskGeometry.x}
                 y={0}
                 width={maskGeometry.width}
                 height={STAFF_HEIGHT}
-                fill="rgba(250, 204, 21, 0.2)" // Yellow-400, 20% opacity
+                fill="rgba(250, 204, 21, 0.2)"
             />
           )}
 
-          {/* Playhead Marker (黄金分割位) */}
           <line 
               x1={PLAYHEAD_X} y1={0} x2={PLAYHEAD_X} y2={STAFF_HEIGHT} 
               stroke="rgba(255,0,0,0.3)" strokeWidth="2" strokeDasharray="4 2" 
           />
 
-          {/* Staff Lines */}
           <g opacity={0.3}>
               {lines.map((y, i) => (
               <line 
