@@ -94,7 +94,7 @@ class SoundEngine {
     if (this.pauseTime > 0) {
       this.totalOffset += (now - this.pauseTime);
     } else {
-      this.startTime = now;
+      this.startTime = now + 0.1;
       this.totalOffset = 0;
       this.nextNoteTime1 = now + 0.1;
       this.nextNoteTime2 = now + 0.1;
