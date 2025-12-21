@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, RefreshCw, Info, Settings2, X, Music, ChevronDown } from 'lucide-react';
+import { Play, Pause, RefreshCw, Info, Settings2, X, Music, ChevronDown, Layout, CircleDot } from 'lucide-react';
 import { MusicStaff } from './components/MusicStaff';
+import { GeometricVisualizer } from './components/GeometricVisualizer'; // New Import
 import { soundEngine } from './services/SoundEngine';
 import { MELODY, NOTE_COUNT, INSTRUMENTS } from './constants';
 
@@ -61,12 +62,18 @@ const GithubCorner = ({ url }: { url: string }) => (
   </a>
 );
 
+// Define View Mode Type
+type ViewMode = 'linear' | 'geometric';
+
 const App: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [phaseCycles, setPhaseCycles] = useState(40);
   const [bpm, setBpm] = useState(280);
   const [selectedInstrumentId, setSelectedInstrumentId] = useState(INSTRUMENTS[0].id);
   const [noteDuration, setNoteDuration] = useState(INSTRUMENTS[0].envelope.decay);
+  
+  // New State for View Switching
+  const [viewMode, setViewMode] = useState<ViewMode>('linear');
   
   const [p1Progress, setP1Progress] = useState(0);
   const [p2Progress, setP2Progress] = useState(0);
@@ -235,7 +242,6 @@ const App: React.FC = () => {
   const distToHalf = Math.abs(notesDiff - nearestHalf);
   const isHighlight = distToHalf < 0.05; 
   
-  // 修改：提取 isIntegerPhase 变量，用于传递给子组件
   const isIntegerPhase = isHighlight && (Math.abs(nearestHalf % 1) < 0.01);
 
   let phaseColorClass = "text-stone-400";
@@ -392,46 +398,76 @@ const App: React.FC = () => {
                     </div>
                 </div>
             </div>
+            
+            {/* View Switcher Controls - NEW */}
+            <div className="flex gap-1 mb-6 p-1 bg-stone-200/50 rounded-xl w-fit">
+                <button 
+                    onClick={() => setViewMode('linear')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'linear' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+                >
+                    <Layout size={14} /> Linear Staff
+                </button>
+                <button 
+                    onClick={() => setViewMode('geometric')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === 'geometric' ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-700'}`}
+                >
+                    <CircleDot size={14} /> Geometric View
+                </button>
+            </div>
 
-            {/* Staves */}
-            <div className="space-y-6">
-                <MusicStaff 
-                    label="Player 1 (Steady)" 
-                    progressP1={p1Progress} 
-                    progressP2={p2Progress}
-                    mode="p1"
-                    chaosWindow={chaosWindow}
-                    futureWindow={futureWindow}
-                    bpm={bpm}
-                />
-                <MusicStaff 
-                    label="Player 2 (Phasing)" 
-                    progressP1={p1Progress} 
-                    progressP2={p2Progress}
-                    mode="p2"
-                    chaosWindow={chaosWindow}
-                    futureWindow={futureWindow}
-                    bpm={bpm}
-                />
-                <div className="relative pt-6">
-                     <div className="absolute top-0 left-10 right-10 h-6 border-l border-r border-t border-dashed border-stone-300 rounded-t-xl"></div>
-                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-stone-50 px-2 text-xs text-stone-400 uppercase tracking-widest">
-                        Acoustic Result
-                     </div>
-                     {/* 修改：传入 highlight={isIntegerPhase} */}
-                    <MusicStaff 
-                        label="Fusion" 
-                        progressP1={p1Progress} 
-                        progressP2={p2Progress}
-                        mode="fusion"
-                        dividerY={dividerY}
-                        onDividerDrag={setDividerY}
-                        chaosWindow={chaosWindow}
-                        futureWindow={futureWindow}
-                        bpm={bpm}
-                        highlight={isIntegerPhase}
-                    />
-                </div>
+            {/* Main Content Area - Modified to Switch Views */}
+            <div className="min-h-[420px]">
+                {viewMode === 'linear' ? (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        <MusicStaff 
+                            label="Player 1 (Steady)" 
+                            progressP1={p1Progress} 
+                            progressP2={p2Progress}
+                            mode="p1"
+                            chaosWindow={chaosWindow}
+                            futureWindow={futureWindow}
+                            bpm={bpm}
+                        />
+                        <MusicStaff 
+                            label="Player 2 (Phasing)" 
+                            progressP1={p1Progress} 
+                            progressP2={p2Progress}
+                            mode="p2"
+                            chaosWindow={chaosWindow}
+                            futureWindow={futureWindow}
+                            bpm={bpm}
+                        />
+                        <div className="relative pt-6">
+                            <div className="absolute top-0 left-10 right-10 h-6 border-l border-r border-t border-dashed border-stone-300 rounded-t-xl"></div>
+                            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-stone-50 px-2 text-xs text-stone-400 uppercase tracking-widest">
+                                Acoustic Result
+                            </div>
+                            <MusicStaff 
+                                label="Fusion" 
+                                progressP1={p1Progress} 
+                                progressP2={p2Progress}
+                                mode="fusion"
+                                dividerY={dividerY}
+                                onDividerDrag={setDividerY}
+                                chaosWindow={chaosWindow}
+                                futureWindow={futureWindow}
+                                bpm={bpm}
+                                highlight={isIntegerPhase}
+                            />
+                        </div>
+                    </div>
+                ) : (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        <GeometricVisualizer p1Progress={p1Progress} p2Progress={p2Progress} />
+                        <div className="mt-8 max-w-2xl mx-auto text-center border-t border-stone-200 pt-6">
+                             <p className="text-xs text-stone-500 leading-relaxed italic">
+                                 {"The left diagram visualizes the 12-note sequence as a 1D sphere ($S^1$). \
+                                 The right diagram maps the system's state space onto a 2D torus ($\mathbb{T}^2$). \
+                                 As the two voices drift in phase, the trajectory deviates from the diagonal, forming closed loops in the state space."}
+                             </p>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="mt-8 lg:hidden">
