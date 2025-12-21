@@ -2,7 +2,9 @@
 
 > An interactive, web-based visualization of Steve Reich's minimalist masterpiece, _Piano Phase_ (1967).
 
-> This project is developed by PKU students group in 2025 Fall Semester as part of the course "Music and Mathematics". Group ID: T5-3.
+> This project is developed by PKU students group in 2025 Fall Semester as part of the course "Music and Mathematics".
+>
+> `Group ID`: `T5-3`
 
 **[Live Demo](https://thywquake.github.io/Piano-Phase)**
 
@@ -40,8 +42,8 @@ The project follows a variant of the **MVC (Model-View-Controller)** pattern to 
 
 - **Linear Staff**: SVG-based rendering showing the relative positions of both voices and the resulting acoustic fusion.
 - **Geometric Visualizer**:
-- ** Melody Clock**: Maps the 12-note sequence onto a circle to intuitively demonstrate the cyclic structure.
-- ** Phase State Space**: Maps the phase states of the two voices onto a 2D torus unrolled map and an **interactive 3D Torus**.
+- **Melody Clock**: Maps the 12-note sequence onto a circle to intuitively demonstrate the cyclic structure.
+- **Phase State Space**: Maps the phase states of the two voices onto a 2D torus unrolled map and an **interactive 3D Torus**.
 - **Topological Trajectory**: Tracks the movement of phases within the state space, visualizing the formation of Torus Knots.
 
 ## ✨ Key Features
