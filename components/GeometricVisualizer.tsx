@@ -61,6 +61,22 @@ export const GeometricVisualizer: React.FC<GeometricVisualizerProps> = ({
     }
   }, [showInfo]);
 
+  // Logic for highlight effect (Green Flash on Integer Phase)
+  // Replicated from App.tsx to ensure visual synchronization
+  const isIntegerPhase = React.useMemo(() => {
+    let rawDiff = p2Progress - p1Progress;
+    if (rawDiff < 0) rawDiff += 1;
+    const notesDiff = rawDiff * NOTE_COUNT;
+    const doubled = notesDiff * 2;
+    const nearestHalf = Math.round(doubled) / 2;
+    const distToHalf = Math.abs(notesDiff - nearestHalf);
+    
+    // Check if close enough to a "step"
+    const isClose = distToHalf < 0.05;
+    // Check if that step is an integer (unison/canon point)
+    return isClose && (Math.abs(nearestHalf % 1) < 0.01);
+  }, [p1Progress, p2Progress]);
+
   const renderMelodyClock = () => {
     // Increased size
     const radius = 120;
@@ -154,13 +170,20 @@ export const GeometricVisualizer: React.FC<GeometricVisualizerProps> = ({
             <div className="absolute -left-1 bottom-0 text-[10px] text-stone-400 font-mono -translate-x-full translate-y-1/2">0°</div>
 
             {/* Main Graph Box */}
-            <div className="relative border border-stone-200 bg-white shadow-inner" style={{ width: size, height: size }}>
+            <div 
+              className={`relative border transition-all duration-500 ease-in-out ${
+                isIntegerPhase 
+                  ? 'bg-emerald-50 border-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.2)]' 
+                  : 'bg-white border-stone-200 shadow-inner'
+              }`}
+              style={{ width: size, height: size }}
+            >
             <svg width={size} height={size} className="overflow-visible">
                 {/* Grid */}
                 {[...Array(gridCount + 1)].map((_, i) => (
                 <React.Fragment key={i}>
-                    <line x1={i * step} y1={0} x2={i * step} y2={size} stroke="#f1f5f9" strokeWidth="1" />
-                    <line x1={0} y1={i * step} x2={size} y2={i * step} stroke="#f1f5f9" strokeWidth="1" />
+                    <line x1={i * step} y1={0} x2={i * step} y2={size} stroke={isIntegerPhase ? "rgba(16, 185, 129, 0.1)" : "#f1f5f9"} strokeWidth="1" />
+                    <line x1={0} y1={i * step} x2={size} y2={i * step} stroke={isIntegerPhase ? "rgba(16, 185, 129, 0.1)" : "#f1f5f9"} strokeWidth="1" />
                 </React.Fragment>
                 ))}
 
