@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, RefreshCw, Info, Settings2, X, Music, ChevronDown, Layout, CircleDot } from 'lucide-react';
 import { MusicStaff } from './components/MusicStaff';
-import { GeometricVisualizer } from './components/GeometricVisualizer'; // New Import
+import { GeometricVisualizer } from './components/GeometricVisualizer'; 
 import { soundEngine } from './services/SoundEngine';
 import { MELODY, NOTE_COUNT, INSTRUMENTS } from './constants';
 
@@ -88,6 +88,9 @@ const App: React.FC = () => {
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+
+  // ADDED: Trigger to clear visualization history
+  const [resetTrigger, setResetTrigger] = useState(0);
   
   const rafRef = useRef<number | null>(null);
 
@@ -204,6 +207,8 @@ const App: React.FC = () => {
     setP1Progress(0);
     setP2Progress(0);
     setChaosScore(0);
+    // ADDED: Increment trigger to clear history
+    setResetTrigger(prev => prev + 1);
   };
 
   const handlePhaseChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -417,8 +422,9 @@ const App: React.FC = () => {
 
             {/* Main Content Area - Modified to Switch Views */}
             <div className="min-h-[420px]">
-                {viewMode === 'linear' ? (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                {/* Linear View Container */}
+                <div className={viewMode === 'linear' ? 'block animate-in fade-in slide-in-from-bottom-2 duration-500' : 'hidden'}>
+                    <div className="space-y-6">
                         <MusicStaff 
                             label="Player 1 (Steady)" 
                             progressP1={p1Progress} 
@@ -456,18 +462,19 @@ const App: React.FC = () => {
                             />
                         </div>
                     </div>
-                ) : (
-                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                        <GeometricVisualizer p1Progress={p1Progress} p2Progress={p2Progress} />
-                        <div className="mt-8 max-w-2xl mx-auto text-center border-t border-stone-200 pt-6">
-                             <p className="text-xs text-stone-500 leading-relaxed italic">
-                                 {"The left diagram visualizes the 12-note sequence as a 1D sphere ($S^1$). \
-                                 The right diagram maps the system's state space onto a 2D torus ($\mathbb{T}^2$). \
-                                 As the two voices drift in phase, the trajectory deviates from the diagonal, forming closed loops in the state space."}
-                             </p>
-                        </div>
-                    </div>
-                )}
+                </div>
+
+                {/* Geometric View Container - Kept mounted to preserve trajectory history */}
+                <div className={viewMode === 'geometric' ? 'block animate-in fade-in slide-in-from-bottom-2 duration-500' : 'hidden'}>
+                    <GeometricVisualizer 
+                        p1Progress={p1Progress} 
+                        p2Progress={p2Progress} 
+                        bpm={bpm}                  // PASS PROP
+                        phaseCycles={phaseCycles}  // PASS PROP
+                        resetTrigger={resetTrigger} // PASS PROP
+                        isVisible={viewMode === 'geometric'} // NEW PROP
+                    />
+                </div>
             </div>
 
             <div className="mt-8 lg:hidden">
