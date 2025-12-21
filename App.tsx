@@ -109,9 +109,6 @@ const App: React.FC = () => {
     const p2Pos = p2 * loopDur; 
     const timestamps: number[] = [];
     
-    // 非对称窗口
-    // 过去：(windowTotal - future)
-    // 未来：future
     const futureLimit = future;
     const pastLimit = Math.max(0, windowTotal - futureLimit);
 
@@ -560,7 +557,7 @@ const App: React.FC = () => {
             <div className="mt-12 border-t border-stone-200 pt-8 pb-8">
                 <div className="flex flex-row justify-between items-start gap-6 max-w-4xl mx-auto"> 
                     
-                    {/* 左侧文字/图标内容块 */}
+                    {/* Left Text Content */}
                     <div className="flex-1">
                         <div className="flex items-start gap-4">
                             <div className="p-3 bg-stone-100 rounded-full text-stone-500 hidden sm:block">
@@ -583,7 +580,7 @@ const App: React.FC = () => {
                         </div>
                     </div>
                     
-                    {/* 右侧头像 */}
+                    {/* Right Portrait */}
                     <div className="shrink-0 hidden sm:block pt-2 flex flex-col items-center">
                         <a href="https://stevereich.com/" target="_blank" rel="noopener noreferrer" className="flex flex-col items-center group">
                             <img 

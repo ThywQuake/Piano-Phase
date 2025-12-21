@@ -22,7 +22,7 @@ const BASE_Y = 70;
 const VISIBLE_WINDOW_SCALE = 1.0; 
 const STEM_HEIGHT = 22;
 
-// 定义分组类型
+// Defined a NoteGroup type for better structure
 interface NoteGroup {
   direction: 'up' | 'down';
   notes: {
@@ -49,21 +49,8 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
   const [isDragging, setIsDragging] = useState(false);
 
   // Groups logic
-  // 根据原著重构分组：交替的声部
+  // Each group contains notes that are beamed together
   const groups: NoteGroup[] = useMemo(() => {
-    // 0-based index mapping:
-    // 原著 (1, 3, 5) -> indices [0, 2, 4] -> 下方
-    // 原著 (2, 4, 6) -> indices [1, 3, 5] -> 上方
-    // 原著 (7, 9, 11) -> indices [6, 8, 10] -> 下方
-    // 原著 (8, 10, 12) -> indices [7, 9, 11] -> 上方
-
-    // const definitions = [
-    //   { indices: [0, 2, 4], direction: 'down' as const },
-    //   { indices: [1, 3, 5], direction: 'up' as const },
-    //   { indices: [6, 8, 10], direction: 'down' as const },
-    //   { indices: [7, 9, 11], direction: 'up' as const },
-    // ];
-
     const definitions = [
       { indices: [0, 2, 4], direction: 'down' as const },
       { indices: [1, 3], direction: 'up' as const },
@@ -132,7 +119,6 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
     }
   };
 
-  // 修改：接收 direction 参数
   const renderBeamedGroup = (
     group: NoteGroup, 
     progress: number, 
@@ -149,21 +135,18 @@ export const MusicStaff: React.FC<MusicStaffProps> = ({
 
     if (notesWithPos[notesWithPos.length-1].x < -50 || notesWithPos[0].x > STAFF_WIDTH + 50) return null;
 
-    // 计算符梁高度
     let beamY;
     if (direction === 'up') {
-        // 符杆向上：以最高音（y最小）为基准再往上
         const minY = Math.min(...notesWithPos.map(n => n.y));
         beamY = minY - STEM_HEIGHT;
     } else {
-        // 符杆向下：以最低音（y最大）为基准再往下
         const maxY = Math.max(...notesWithPos.map(n => n.y));
         beamY = maxY + STEM_HEIGHT;
     }
 
     return (
       <g key={`group-${loopOffset}-${notes[0].index}`}>
-        {/* Beam (横梁) */}
+        {/* Beam */}
         <line 
           x1={notesWithPos[0].x} y1={beamY} 
           x2={notesWithPos[notesWithPos.length-1].x} y2={beamY}

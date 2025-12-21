@@ -8,23 +8,23 @@ interface PhaseTorus3DProps {
   p1Progress: number;
   p2Progress: number;
   history: { x: number; y: number }[];
-  isIntegerPhase: boolean; // 接收高亮状态
+  isIntegerPhase: boolean;
 }
 
-// 环面几何参数
-const TORUS_R = 2.5; // 大半径 (Player 1)
-const TORUS_r = 0.8; // 小半径 (Player 2)
+// Parameters for the torus
+const TORUS_R = 2.5; // Major radius (Player 1)
+const TORUS_r = 0.8; // Minor radius (Player 2)
 
-// 坐标映射函数
-// 配合 group rotation={[-Math.PI / 2, 0, 0]} 使用
+// Coordinate mapping function
+// Used with group rotation={[-Math.PI / 2, 0, 0]}
 const getTorusPosition = (u: number, v: number): [number, number, number] => {
   const phi = u * Math.PI * 2;   // 大圆角度
   const theta = v * Math.PI * 2; // 小圆角度
 
   const dist = TORUS_R + TORUS_r * Math.cos(theta);
 
-  // 映射到 XZ 平面为主体的 3D 空间
-  // 注意 z 的负号，用于抵消旋转带来的坐标系变换，确保点贴合表面
+  // Mapped to 3D space with XZ plane as main
+  // Note the negative sign on z to counteract coordinate system changes due to rotation, ensuring points stick to the surface
   const x = dist * Math.cos(phi);
   const y = TORUS_r * Math.sin(theta);
   const z = -dist * Math.sin(phi);
@@ -36,33 +36,33 @@ const Scene: React.FC<PhaseTorus3DProps> = ({ p1Progress, p2Progress, history, i
   const materialRef = useRef<THREE.MeshStandardMaterial>(null);
   const gridMaterialRef = useRef<THREE.MeshBasicMaterial>(null);
 
-  // 1. 计算当前动点位置
+  // 1. Calculate current moving point position
   const currentPos = useMemo(() => 
     new THREE.Vector3(...getTorusPosition(p1Progress, p2Progress)), 
   [p1Progress, p2Progress]);
 
-  // 2. 计算轨迹线顶点
+  // 2. Calculate trajectory line vertices
   const points = useMemo(() => {
     return history.map(p => new THREE.Vector3(...getTorusPosition(p.x, p.y)));
   }, [history]);
 
-  // 3. 材质动画帧循环
+  // 3. Material animation frame loop
   useFrame((state, delta) => {
     if (materialRef.current) {
-      // 颜色过渡：普通状态(灰白) -> 高亮状态(淡翡翠绿)
+      // Color transition: normal state (gray-white) -> highlight state (light emerald green)
       const targetColor = isIntegerPhase ? new THREE.Color("#ecfdf5") : new THREE.Color("#f8fafc");
-      // 自发光过渡：普通状态(无) -> 高亮状态(强绿光)
+      // Emissive transition: normal state (none) -> highlight state (strong green)
       const targetEmissive = isIntegerPhase ? new THREE.Color("#10b981") : new THREE.Color("#000000");
-      // 透明度微调
+      // Opacity adjustment
       const targetOpacity = isIntegerPhase ? 0.95 : 0.85;
 
-      const speed = 4.0; // 过渡速度
+      const speed = 4.0; // Transition speed
       materialRef.current.color.lerp(targetColor, speed * delta);
       materialRef.current.emissive.lerp(targetEmissive, speed * delta);
       materialRef.current.opacity += (targetOpacity - materialRef.current.opacity) * speed * delta;
     }
 
-    // 线框颜色同步过渡
+    // Wireframe color transition
     if (gridMaterialRef.current) {
         const targetColor = isIntegerPhase ? new THREE.Color("#34d399") : new THREE.Color("#94a3b8");
         gridMaterialRef.current.color.lerp(targetColor, 4.0 * delta);
@@ -74,7 +74,7 @@ const Scene: React.FC<PhaseTorus3DProps> = ({ p1Progress, p2Progress, history, i
       <ambientLight intensity={0.7} />
       <pointLight position={[10, 10, 10]} intensity={1.5} />
       
-      {/* 动态环境光：仅在高亮时开启，照亮环面内壁 */}
+      {/* Dynamic ambient light: only on during highlight */}
       <pointLight 
         position={[0, 0, 0]} 
         intensity={isIntegerPhase ? 2 : 0} 
@@ -83,9 +83,9 @@ const Scene: React.FC<PhaseTorus3DProps> = ({ p1Progress, p2Progress, history, i
         decay={2} 
       />
       
-      {/* 核心环面组：旋转 -90 度以水平放置 */}
+      {/* Core torus group: rotated -90 degrees for horizontal placement */}
       <group rotation={[-Math.PI / 2, 0, 0]}>
-        {/* 实体层 */}
+        {/* Solid layer */}
         <mesh>
           <torusGeometry args={[TORUS_R, TORUS_r, 64, 64]} />
           <meshStandardMaterial 
@@ -97,7 +97,7 @@ const Scene: React.FC<PhaseTorus3DProps> = ({ p1Progress, p2Progress, history, i
           />
         </mesh>
 
-        {/* 线框层 */}
+        {/* Wireframe layer */}
         <mesh>
           <torusGeometry args={[TORUS_R, TORUS_r + 0.01, 32, 32]} />
           <meshBasicMaterial 
@@ -109,7 +109,7 @@ const Scene: React.FC<PhaseTorus3DProps> = ({ p1Progress, p2Progress, history, i
         </mesh>
       </group>
 
-      {/* 当前相位点 */}
+      {/* Current phase point */}
       <mesh position={currentPos}>
         <sphereGeometry args={[isIntegerPhase ? 0.2 : 0.12, 32, 32]} />
         <meshBasicMaterial color={isIntegerPhase ? "#34d399" : PlayerColor.Fusion} toneMapped={false} />
@@ -121,7 +121,7 @@ const Scene: React.FC<PhaseTorus3DProps> = ({ p1Progress, p2Progress, history, i
         />
       </mesh>
 
-      {/* 历史轨迹线 */}
+      {/* Historical trajectory line */}
       {points.length > 1 && (
         <Line
           points={points}
@@ -132,7 +132,7 @@ const Scene: React.FC<PhaseTorus3DProps> = ({ p1Progress, p2Progress, history, i
         />
       )}
       
-      {/* 3D 文字标签 */}
+      {/* 3D text label */}
       <group position={[0, -1.5, 0]}>
          <Text position={[0, 0, TORUS_R + 1.8]} fontSize={0.25} color="#94a3b8" rotation={[-Math.PI/2, 0, 0]}>
             Player 1 Cycle (Major Axis)
@@ -145,7 +145,7 @@ const Scene: React.FC<PhaseTorus3DProps> = ({ p1Progress, p2Progress, history, i
         minDistance={5} 
         maxDistance={20}
         minPolarAngle={0}
-        maxPolarAngle={Math.PI / 1.5} // 限制视角防止穿帮
+        maxPolarAngle={Math.PI / 1.5} // Limit view angle to prevent clipping
       />
     </>
   );

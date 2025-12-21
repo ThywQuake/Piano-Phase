@@ -126,7 +126,7 @@ export const GeometricVisualizer: React.FC<GeometricVisualizerProps> = ({
         </svg>
 
         {/* Legend Position Adjustment: 
-            使用了负值的 bottom 和 left，将其向外推，离圆盘主体更远。
+        Moved inside the relative container to better control positioning
         */}
         <div className="absolute -bottom-6 -left-6 flex flex-col gap-2 p-3 rounded-xl bg-white/80 backdrop-blur-sm border border-stone-100 shadow-sm z-10 scale-90 origin-bottom-left">
            <div className="flex items-center gap-2">
@@ -196,9 +196,6 @@ export const GeometricVisualizer: React.FC<GeometricVisualizerProps> = ({
   };
 
   return (
-    // Layout Adjustments:
-    // 1. Reduced Padding: `p-6 lg:p-10` -> `p-6` (去掉了过大的 lg:p-10)
-    // 2. Reduced Gap: `space-y-12` -> `space-y-8` (减小了上下两部分的垂直间距)
     <div className="relative p-2 bg-white/50 rounded-3xl border border-stone-200 backdrop-blur-sm space-y-8">
       
       {/* Info Button - Position adjusted slightly to match new padding if needed, but keeping absolute is fine */}
