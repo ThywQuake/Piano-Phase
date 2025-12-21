@@ -6,7 +6,7 @@
 >
 > `Group ID`: `T5-3`
 
-**[Live Demo](https://thywquake.github.io/Piano-Phase)**
+👉 **[Live Demo](https://thywquake.github.io/Piano-Phase)**
 
 ## 📖 Project Overview
 
